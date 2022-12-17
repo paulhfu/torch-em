@@ -49,7 +49,7 @@ def _download_annotation_file(path, split, download):
     return annotation_file
 
 
-def _create_segmentations_from_annotations(annotation_file, image_folder, seg_folder, cell_types):
+def _create_segmentations_from_annotations(annotation_file, image_folder, seg_folder, cell_types, rnd_subsmpl_ratio):
     # TODO try except to explain how to install this
     from pycocotools.coco import COCO
 
@@ -98,10 +98,11 @@ def _create_segmentations_from_annotations(annotation_file, image_folder, seg_fo
 
     assert len(image_paths) == len(seg_paths)
     assert len(image_paths) > 0, f"No matching image paths were found. Did you pass invalid cell type naems ({cell_types})?"
-    return image_paths, seg_paths
+    subsampling_indices = np.random.choice(len(image_paths), size=int(len(image_paths) * rnd_subsmpl_ratio), replace=False)
+    return [image_paths[i] for i in subsampling_indices], [seg_paths[i] for i in subsampling_indices]
 
 
-def _download_livecell_annotations(path, split, download, cell_types):
+def _download_livecell_annotations(path, split, download, cell_types, rnd_subsmpl_ratio):
     annotation_file = _download_annotation_file(path, split, download)
     if split == "test":
         split_name = "livecell_test_images"
@@ -113,7 +114,7 @@ def _download_livecell_annotations(path, split, download, cell_types):
         seg_folder = os.path.join(path, "annotations", split_name)
     assert os.path.exists(image_folder), image_folder
 
-    return _create_segmentations_from_annotations(annotation_file, image_folder, seg_folder, cell_types)
+    return _create_segmentations_from_annotations(annotation_file, image_folder, seg_folder, cell_types, rnd_subsmpl_ratio)
 
 
 def _livecell_segmentation_loader(
@@ -154,14 +155,14 @@ def _livecell_segmentation_loader(
 
 def get_livecell_loader(path, patch_shape, split, download=False,
                         offsets=None, boundaries=False, binary=False,
-                        cell_types=None, **kwargs):
+                        cell_types=None, rnd_subsmpl_ratio=1.0, **kwargs):
     assert split in ("train", "val", "test")
     if cell_types is not None:
         assert isinstance(cell_types, (list, tuple)),\
             f"cell_types must be passed as a list or tuple instead of {cell_types}"
     
     _download_livecell_images(path, download)
-    image_paths, seg_paths = _download_livecell_annotations(path, split, download, cell_types)
+    image_paths, seg_paths = _download_livecell_annotations(path, split, download, cell_types, rnd_subsmpl_ratio)
 
     assert sum((offsets is not None, boundaries, binary)) <= 1
     label_dtype = torch.int64

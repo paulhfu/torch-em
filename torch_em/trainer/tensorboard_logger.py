@@ -136,3 +136,58 @@ class TensorboardLogger(TorchEmLogger):
         self.tb.add_scalar(tag="validation/loss", scalar_value=loss, global_step=step)
         self.tb.add_scalar(tag="validation/metric", scalar_value=metric, global_step=step)
         self.log_images(step, x, y, prediction, "validation")
+
+class MaskedPretrainLogger(TorchEmLogger):
+    def __init__(self, trainer, save_root, **unused_kwargs):
+        super().__init__(trainer, save_root)
+        self.log_dir = f"./logs/{trainer.name}" if save_root is None else\
+            os.path.join(save_root, "logs", trainer.name)
+        os.makedirs(self.log_dir, exist_ok=True)
+
+        if SummaryWriter is None:
+            msg = "Need tensorboard package to use logger. Install it via 'conda install -c conda-forge tensorboard'"
+            raise RuntimeError(msg)
+        self.tb = torch.utils.tensorboard.SummaryWriter(self.log_dir)
+        self.log_image_interval = trainer.log_image_interval
+
+        # derive which visualisation method is appropriate, based on the loss function
+        if type(trainer.loss) in EMBEDDING_LOSSES:
+            self.have_embeddings = True
+            self.make_image = make_embedding_image
+        else:
+            self.have_embeddings = False
+            self.make_image = make_grid_image
+
+    def log_images(self, step, x, y, prediction, name, gradients=None):
+
+        selection = np.s_[0] if x.ndim == 4 else np.s_[0, :, x.shape[2] // 2]
+
+        image = normalize_im(x[selection].cpu())
+        self.tb.add_image(tag=f"{name}/input",
+                          img_tensor=image,
+                          global_step=step)
+
+        im, im_name = self.make_image(image, y, prediction, selection, gradients)
+        im_name = f"{name}/{im_name}"
+        self.tb.add_image(tag=im_name, img_tensor=im, global_step=step)
+
+    def log_train(self, step, loss, lr, x, y, prediction, log_gradients=False):
+        prediction, mask, inp = prediction
+        self.tb.add_scalar(tag="train/loss", scalar_value=loss, global_step=step)
+        self.tb.add_scalar(tag="train/learning_rate", scalar_value=lr, global_step=step)
+
+        # the embedding visualisation function currently doesn't support gradients,
+        # so we can't log them even if log_gradients is true
+        log_grads = log_gradients
+        if self.have_embeddings:
+            log_grads = False
+
+        if step % self.log_image_interval == 0:
+            gradients = prediction.grad if log_grads else None
+            self.log_images(step, x, y, prediction, "train", gradients=gradients)
+
+    def log_validation(self, step, metric, loss, x, y, prediction):
+        prediction, mask, inp = prediction
+        self.tb.add_scalar(tag="validation/loss", scalar_value=loss, global_step=step)
+        self.tb.add_scalar(tag="validation/metric", scalar_value=metric, global_step=step)
+        self.log_images(step, x, y, prediction, "validation")
