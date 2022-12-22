@@ -128,7 +128,7 @@ class TensorboardLogger(TorchEmLogger):
         if self.have_embeddings:
             log_grads = False
 
-        if step % self.log_image_interval == 0:
+        if isinstance(prediction, torch.Tensor) and step % self.log_image_interval == 0:
             gradients = prediction.grad if log_grads else None
             self.log_images(step, x, y, prediction, "train", gradients=gradients)
 
@@ -184,10 +184,10 @@ class MaskedPretrainLogger(TorchEmLogger):
 
         if step % self.log_image_interval == 0:
             gradients = prediction.grad if log_grads else None
-            self.log_images(step, x, y, prediction, "train", gradients=gradients)
+            self.log_images(step, x, mask, prediction, "train", gradients=gradients)
 
     def log_validation(self, step, metric, loss, x, y, prediction):
         prediction, mask, inp = prediction
         self.tb.add_scalar(tag="validation/loss", scalar_value=loss, global_step=step)
         self.tb.add_scalar(tag="validation/metric", scalar_value=metric, global_step=step)
-        self.log_images(step, x, y, prediction, "validation")
+        self.log_images(step, x, mask, prediction, "validation")
