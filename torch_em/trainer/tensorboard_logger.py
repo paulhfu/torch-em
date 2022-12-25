@@ -172,7 +172,7 @@ class MaskedPretrainLogger(TorchEmLogger):
         self.tb.add_image(tag=im_name, img_tensor=im, global_step=step)
 
     def log_train(self, step, loss, lr, x, y, prediction, log_gradients=False):
-        prediction, mask, inp = prediction
+        prediction, _, _, mask = prediction
         self.tb.add_scalar(tag="train/loss", scalar_value=loss, global_step=step)
         self.tb.add_scalar(tag="train/learning_rate", scalar_value=lr, global_step=step)
 
@@ -187,7 +187,7 @@ class MaskedPretrainLogger(TorchEmLogger):
             self.log_images(step, x, mask, prediction, "train", gradients=gradients)
 
     def log_validation(self, step, metric, loss, x, y, prediction):
-        prediction, mask, inp = prediction
+        prediction, _, _, mask = prediction
         self.tb.add_scalar(tag="validation/loss", scalar_value=loss, global_step=step)
         self.tb.add_scalar(tag="validation/metric", scalar_value=metric, global_step=step)
         self.log_images(step, x, mask, prediction, "validation")
