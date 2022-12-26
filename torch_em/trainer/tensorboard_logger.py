@@ -173,7 +173,7 @@ class MaskedPretrainLogger(TorchEmLogger):
     def log_train(self, step, loss, lr, x, y, prediction, log_gradients=False):
         prediction, mask, _, patch = prediction
         spatial_mask = patch.inversePatching(patch(torch.ones_like(prediction)) * mask[..., None]) == 0
-        y = torch.cat((spatial_mask, prediction * spatial_mask), dim=1)
+        y = torch.cat((spatial_mask, x * spatial_mask), dim=1)
         self.tb.add_scalar(tag="train/loss", scalar_value=loss, global_step=step)
         self.tb.add_scalar(tag="train/learning_rate", scalar_value=lr, global_step=step)
 
@@ -190,7 +190,7 @@ class MaskedPretrainLogger(TorchEmLogger):
     def log_validation(self, step, metric, loss, x, y, prediction):
         prediction, mask, _, patch = prediction
         spatial_mask = patch.inversePatching(patch(torch.ones_like(prediction)) * mask[..., None]) == 0
-        y = torch.cat((spatial_mask, prediction * spatial_mask), dim=1)
+        y = torch.cat((spatial_mask, x * spatial_mask), dim=1)
         self.tb.add_scalar(tag="validation/loss", scalar_value=loss, global_step=step)
         self.tb.add_scalar(tag="validation/metric", scalar_value=metric, global_step=step)
         self.log_images(step, x, y, prediction, "validation")
