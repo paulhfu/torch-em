@@ -106,7 +106,6 @@ class TensorboardLogger(TorchEmLogger):
             self.make_image = make_grid_image
 
     def log_images(self, step, x, y, prediction, name, gradients=None):
-
         selection = np.s_[0] if x.ndim == 4 else np.s_[0, :, x.shape[2] // 2]
 
         image = normalize_im(x[selection].cpu())
@@ -172,7 +171,8 @@ class MaskedPretrainLogger(TorchEmLogger):
         self.tb.add_image(tag=im_name, img_tensor=im, global_step=step)
 
     def log_train(self, step, loss, lr, x, y, prediction, log_gradients=False):
-        prediction, _, _, mask = prediction
+        prediction, mask, _, patch = prediction
+        spatial_mask = patch.inversePatching(patch(torch.ones_like(prediction)) * mask[..., None])
         self.tb.add_scalar(tag="train/loss", scalar_value=loss, global_step=step)
         self.tb.add_scalar(tag="train/learning_rate", scalar_value=lr, global_step=step)
 
@@ -184,10 +184,11 @@ class MaskedPretrainLogger(TorchEmLogger):
 
         if step % self.log_image_interval == 0:
             gradients = prediction.grad if log_grads else None
-            self.log_images(step, x, mask, prediction, "train", gradients=gradients)
+            self.log_images(step, x, spatial_mask, prediction, "train", gradients=gradients)
 
     def log_validation(self, step, metric, loss, x, y, prediction):
-        prediction, _, _, mask = prediction
+        prediction, mask, _, patch = prediction
+        spatial_mask = patch.inversePatching(patch(torch.ones_like(prediction)) * mask[..., None])
         self.tb.add_scalar(tag="validation/loss", scalar_value=loss, global_step=step)
         self.tb.add_scalar(tag="validation/metric", scalar_value=metric, global_step=step)
-        self.log_images(step, x, mask, prediction, "validation")
+        self.log_images(step, x, spatial_mask, prediction, "validation")
